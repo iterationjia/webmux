@@ -76,6 +76,8 @@ html, body {
   overflow: hidden;
 }
 .ws-item:hover, .surf-item:hover { background: var(--bg-hover); }
+/* 拖标签到工作区条目上 */
+.ws-item.drop-target { box-shadow: inset 0 0 0 1px var(--accent); }
 .ws-item.active, .surf-item.active { background: var(--bg-hover); }
 
 .ws-item .name, .surf-item .name {

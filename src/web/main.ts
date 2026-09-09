@@ -11,14 +11,14 @@ import {
 } from "./api.ts";
 import { TermPool, type TermView } from "./term.ts";
 import { step, type NavWorkspace } from "./navigation.ts";
+import { Unread } from "./unread.ts";
 
 const IS_MAC = /mac/i.test(navigator.platform || navigator.userAgent);
 const DRAG_TYPE = "text/webmux-surface";
 
 const pool = new TermPool();
 let state: State | null = null;
-/** 页面刚打开时把所有会话都记成「已看过」，否则一进来全是未读角标，那是噪音。 */
-const lastSeen = new Map<string, number>();
+const unread = new Unread();
 let seeded = false;
 let signature = "";
 
@@ -161,12 +161,8 @@ function render(force: boolean): void {
   }
   const visible = visibleSurfaces();
   pool.reap(visible);
-  const now = Date.now();
-  for (const id of visible) lastSeen.set(id, now);
-}
-
-function isUnread(s: Surface, visible: Set<string>): boolean {
-  return !visible.has(s.id) && s.activityAt > (lastSeen.get(s.id) ?? 0);
+  // 水位记的是会话自己的 activityAt（服务端时钟），不是 Date.now()
+  unread.markSeen(state.surfaces, visible);
 }
 
 function renderSidebar(): void {
@@ -182,6 +178,23 @@ function renderSidebar(): void {
     const row = el("div", "ws-item" + (ws.id === w.id ? " active" : ""));
     row.appendChild(el("div", "name", ws.name));
     row.onclick = () => switchWorkspace(ws.id);
+    // 把标签直接拖到侧栏的工作区上 = 移过去。右键菜单那条路仍在，
+    // 这只是快捷方式——拖拽在触控板上、格子很窄时并不好使。
+    row.addEventListener("dragover", (e) => {
+      if (!e.dataTransfer?.types.includes(DRAG_TYPE)) return;
+      e.preventDefault();
+      row.classList.add("drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
+    row.addEventListener("drop", (e) => {
+      row.classList.remove("drop-target");
+      const id = e.dataTransfer?.getData(DRAG_TYPE);
+      if (!id) return;
+      e.preventDefault();
+      const target = wsLeaves(ws);
+      const leafId = (target.find((l) => l.id === ws.focusedLeaf) ?? target[0])?.id;
+      if (leafId) void moveSurface(id, ws.id, leafId);
+    });
     row.oncontextmenu = (e) => {
       e.preventDefault();
       openMenu(e, [
@@ -240,7 +253,7 @@ function surfaceRow(
   const dot = el("div", "dot");
   if (s.dead) dot.classList.add("dead");
   else if (active) dot.classList.add("on");
-  else if (isUnread(s, visible)) dot.classList.add("unread");
+  else if (unread.isUnread(s, visible)) dot.classList.add("unread");
   row.appendChild(dot);
   row.appendChild(el("div", "name", s.title));
   // 右边小字是「另一半信息」：标题已经是命令名时显示目录，反之显示命令
@@ -313,6 +326,16 @@ function buildPane(leaf: LeafNode, w: Workspace): HTMLElement {
   pane.dataset.leaf = leaf.id;
   if (leaf.id === w.focusedLeaf) pane.classList.add("focused");
   pane.addEventListener("mousedown", () => focusLeaf(leaf.id));
+
+  // focus follows mouse：鼠标移到哪格，键盘焦点就跟到哪格，不用先点一下。
+  // 弹层开着时不抢（T-23），窗口本身没焦点时也不抢——否则鼠标只是路过
+  // 浏览器窗口，就把别的应用的焦点搅了。
+  pane.addEventListener("mouseenter", () => {
+    if (uiBlocking() || !document.hasFocus()) return;
+    focusLeaf(leaf.id);
+    const id = leaf.active;
+    if (id) pool.peek(id)?.focus();
+  });
 
   const bar = el("div", "tabbar");
   for (const id of leaf.tabs) {
@@ -503,12 +526,13 @@ function openTabMenu(e: MouseEvent, id: string, leaf: LeafNode, w: Workspace): v
 
 async function reload(next?: State): Promise<void> {
   state = next ?? (await api.state());
+  const alive = new Set(state.surfaces.map((s) => s.id));
   if (!seeded) {
-    const now = Date.now();
-    for (const s of state.surfaces) lastSeen.set(s.id, Math.max(s.activityAt, now));
+    unread.seed(state.surfaces);
     seeded = true;
   }
-  pool.prune(new Set(state.surfaces.map((s) => s.id)));
+  unread.prune(alive);
+  pool.prune(alive);
   render(true);
 }
 
