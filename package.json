@@ -1,0 +1,32 @@
+{
+  "name": "webmux",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "tmux 做底座的网页版多会话终端",
+  "scripts": {
+    "dev": "tsx watch src/server/index.ts",
+    "start": "node --experimental-strip-types src/server/index.ts",
+    "build:web": "vite build",
+    "dev:web": "vite",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "bash scripts/fix-pty.sh"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-search": "^0.16.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/ws": "^8.5",
+    "tsx": "^4.19",
+    "typescript": "^5.7",
+    "vite": "^5.4",
+    "vitest": "^2.1"
+  }
+}
