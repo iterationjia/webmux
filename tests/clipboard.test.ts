@@ -64,10 +64,14 @@ describe("复制", () => {
   });
 
   it("只有无修饰键左键才被转换成普通文本选择", () => {
-    expect(shouldForcePlainSelection(mouse())).toBe(true);
-    expect(shouldForcePlainSelection(mouse({ button: 2 }))).toBe(false);
-    expect(shouldForcePlainSelection(mouse({ shiftKey: true }))).toBe(false);
-    expect(shouldForcePlainSelection(mouse({ altKey: true }))).toBe(false);
-    expect(shouldForcePlainSelection(mouse({ ctrlKey: true }))).toBe(false);
+    expect(shouldForcePlainSelection(mouse(), true)).toBe(true);
+    expect(shouldForcePlainSelection(mouse({ button: 2 }), true)).toBe(false);
+    expect(shouldForcePlainSelection(mouse({ shiftKey: true }), true)).toBe(false);
+    expect(shouldForcePlainSelection(mouse({ altKey: true }), true)).toBe(false);
+    expect(shouldForcePlainSelection(mouse({ ctrlKey: true }), true)).toBe(false);
+  });
+
+  it("终端没上报鼠标时不插手——xterm 自己的选择本来就是好的", () => {
+    expect(shouldForcePlainSelection(mouse(), false)).toBe(false);
   });
 });

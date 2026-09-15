@@ -92,7 +92,8 @@ export class TermView {
     this.el.addEventListener(
       "mousedown",
       (e) => {
-        if (!e.isTrusted || !shouldForcePlainSelection(e)) return;
+        const tracking = this.term.modes.mouseTrackingMode !== "none";
+        if (!e.isTrusted || !shouldForcePlainSelection(e, tracking)) return;
         e.preventDefault();
         e.stopPropagation();
         const mod = forcedSelectionModifier(navigator.platform || navigator.userAgent);
@@ -104,6 +105,9 @@ export class TermView {
             clientY: e.clientY,
             button: 0,
             buttons: 1,
+            // xterm 按 detail 1/2/3 分派单击／双击／三击，缺了它三个分支
+            // 一个都不命中，选区起点永远不设（T-31）
+            detail: e.detail,
             ...mod,
           }),
         );
