@@ -32,6 +32,8 @@ export interface TmuxSession {
   id: string;
   title: string;
   cwd: string;
+  /** pane 的终端设备（如 /dev/pts/3）。qwen 会话靠它跟进程对上号（T-30）。 */
+  paneTty: string;
   paneTitle: string;
   createdAt: number;
   activityAt: number;
@@ -55,6 +57,7 @@ const FIELDS = [
   "#{pane_current_command}",
   "#{pane_dead}",
   "#{pane_current_path}",
+  "#{pane_tty}",
   `#{${TITLE_OPTION}}`,
   "#{pane_title}",
 ].join(SEP);
@@ -113,7 +116,7 @@ export class Tmux {
     for (const line of stdout.split("\n")) {
       if (!line) continue;
       const parts = line.split(SEP);
-      if (parts.length < 9) continue;
+      if (parts.length < 10) continue;
       const name = parts[0];
       if (!name.startsWith(this.cfg.prefix)) continue; // INV-8
       out.push({
@@ -125,10 +128,11 @@ export class Tmux {
         command: parts[4] ?? "",
         dead: parts[5] === "1",
         cwd: parts[6] ?? "",
+        paneTty: parts[7] ?? "",
         // 空串保持空串 —— 那是「没手动命名过」的唯一标志（INV-7）
-        title: parts[7] ?? "",
+        title: parts[8] ?? "",
         // 兜回被分隔符切碎的 pane_title（T-2）
-        paneTitle: parts.slice(8).join(SEP),
+        paneTitle: parts.slice(9).join(SEP),
       });
     }
     out.sort((a, b) => a.createdAt - b.createdAt);
