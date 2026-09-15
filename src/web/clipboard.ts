@@ -63,9 +63,13 @@ export function forcedSelectionModifier(
 /**
  * tmux 开了 mouse on 之后普通拖拽会被发给 tmux，用户看起来就是「怎么拖都选不中」。
  * 只有真实的无修饰键左键才转换成强制文本选择；带任意修饰键时放行给 TUI（T-14）。
+ *
+ * ⚠️ 只在终端**确实在上报鼠标**时才转换。没上报时 xterm 自己的选择本来就是好的，
+ * 这时硬塞一个带修饰键的合成事件反而更糟：非 Mac 合成的是 Shift，xterm 把它当
+ * 「扩展选区」，首次点击没有起点可扩展，于是一个字都选不中（T-31）。
  */
-export function shouldForcePlainSelection(e: MouseLike): boolean {
+export function shouldForcePlainSelection(e: MouseLike, mouseTracking: boolean): boolean {
   return (
-    e.button === 0 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey
+    mouseTracking && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey
   );
 }
