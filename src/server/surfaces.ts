@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 import { basename } from "node:path";
 import type { Config } from "./config.ts";
+import { QwenTitles, isQwenPane } from "./qwenTitle.ts";
 import { Tmux, type TmuxSession } from "./tmux.ts";
 
 /** 忘了关的会话会一直攒着，每个都是常驻 shell。 */
@@ -119,10 +120,27 @@ export class Surfaces {
   constructor(
     private readonly tmux: Tmux,
     private readonly cfg: Config,
+    private readonly qwenTitles: QwenTitles = new QwenTitles(),
   ) {}
 
   async list(): Promise<Surface[]> {
-    return (await this.tmux.listSessions()).map(toSurface);
+    const sessions = await this.tmux.listSessions();
+    return await Promise.all(sessions.map((s) => this.withTopic(s)));
+  }
+
+  /**
+   * qwen-code 自报的标题永远是 `Qwen - <目录名>`，同目录开几个就分不清了，
+   * 到它自己的会话文件里把话题捞回来（T-30）。
+   *
+   * 两条底线：手动命名过的纹丝不动（INV-7）；解析失败只丢这一个标题，
+   * 绝不能拖垮整个会话列表。
+   */
+  private async withTopic(s: TmuxSession): Promise<Surface> {
+    const surface = toSurface(s);
+    if (surface.pinned) return surface;
+    if (!isQwenPane(s.command, stripDecor(s.paneTitle))) return surface;
+    const topic = await this.qwenTitles.resolve(s.cwd, s.paneTty).catch(() => null);
+    return topic ? { ...surface, title: topic } : surface;
   }
 
   async get(id: string): Promise<Surface | null> {
