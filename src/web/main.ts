@@ -359,10 +359,6 @@ function buildPane(leaf: LeafNode, w: Workspace): HTMLElement {
       e.dataTransfer?.setData(DRAG_TYPE, id);
       e.dataTransfer?.setData("text/plain", id);
     });
-    tab.oncontextmenu = (e) => {
-      e.preventDefault();
-      openTabMenu(e, id, leaf, w);
-    };
     bar.appendChild(tab);
   }
 
@@ -485,43 +481,6 @@ function closeMenu(): void {
   document.querySelectorAll(".menu").forEach((m) => m.remove());
 }
 
-/**
- * 移动终端必须有一条确定性路径：菜单里直接列出所有去处。拖拽只是快捷方式 ——
- * 触控板上、格子很窄时并不好使。
- */
-function openTabMenu(e: MouseEvent, id: string, leaf: LeafNode, w: Workspace): void {
-  const items: (MenuItem | "sep" | { head: string })[] = [];
-  const others = wsLeaves(w).filter((l) => l.id !== leaf.id);
-  if (others.length) {
-    items.push({ head: "移到格子" });
-    others.forEach((l, i) => {
-      const shown = l.active ? surfaceById(l.active)?.title ?? "空" : "空";
-      items.push({
-        label: `格子 ${i + 2}（${shown}）`,
-        run: () => void moveSurface(id, w.id, l.id),
-      });
-    });
-  }
-  const otherWs = (state?.workspaces ?? []).filter((x) => x.id !== w.id);
-  if (otherWs.length) {
-    items.push({ head: "移到工作区" });
-    for (const ws of otherWs) {
-      items.push({
-        label: ws.name,
-        run: () => void moveSurface(id, ws.id, wsLeaves(ws)[0].id),
-      });
-    }
-  }
-  items.push("sep");
-  items.push({ label: "新建左右分屏并移过去", run: () => void splitAndMove(id, "row", leaf.id) });
-  items.push({ label: "新建上下分屏并移过去", run: () => void splitAndMove(id, "col", leaf.id) });
-  items.push("sep");
-  const s = surfaceById(id);
-  if (s) items.push({ label: "重命名…", run: () => void renameSurface(s) });
-  items.push({ label: "关闭", danger: true, run: () => void closeSurface(id) });
-  openMenu(e, items);
-}
-
 // ——————————————————————— 动作 ———————————————————————
 
 async function reload(next?: State): Promise<void> {
@@ -549,18 +508,6 @@ const newSurface = (leafId?: string) =>
 
 const split = (dir: "row" | "col", leafId?: string) =>
   guard(async () => reload(await api.split({ dir, leafId })));
-
-async function splitAndMove(id: string, dir: "row" | "col", leafId: string): Promise<void> {
-  await guard(async () => {
-    const res = await api.split({ dir, leafId });
-    const w = res.workspaces.find((x) => x.id === res.activeWorkspace)!;
-    const target = leavesOf(w.layout).find((l) => l.tabs.includes(res.surface.id))!;
-    await api.move(id, w.id, target.id);
-    // 新分屏是为了放这个标签，那个顺带建出来的会话就不留了
-    await api.close(res.surface.id);
-    await reload();
-  });
-}
 
 const closeSurface = (id: string) => guard(async () => reload(await api.close(id)));
 const closeLeaf = (leafId: string) => guard(async () => reload(await api.closeLeaf(leafId)));
